@@ -74,12 +74,15 @@ config CPU_FREQ_DEFAULT_GOV_WHEATLEY
 	help
 	  Use the CPUFreq governor 'wheatley' as default.
 
+<<<<<<< HEAD
 config CPU_FREQ_DEFAULT_GOV_SMARTMAX
 	bool "smartmax"
 	select CPU_FREQ_GOV_SMARTMAX
 	help
 	  Use the CPUFreq governor 'smartmax' as default
 
+=======
+>>>>>>> f2a5bee... Added CPUfreq governor 'wheatley'
 config CPU_FREQ_DEFAULT_GOV_USERSPACE
 	bool "userspace"
 	select CPU_FREQ_GOV_USERSPACE
