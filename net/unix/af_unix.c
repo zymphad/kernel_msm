@@ -824,7 +824,7 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	char *sun_path = sunaddr->sun_path;
 	struct dentry *dentry = NULL;
 	struct path path;
-	int err = 0;
+	int err;
 	unsigned hash = 0;
 	struct unix_address *addr;
 	struct hlist_head *list;
@@ -966,7 +966,7 @@ static int unix_dgram_connect(struct socket *sock, struct sockaddr *addr,
 	struct sockaddr_un *sunaddr = (struct sockaddr_un *)addr;
 	struct sock *other;
 	unsigned hash = 0;
-	int err = 0;
+	int err;
 
 	if (addr->sa_family != AF_UNSPEC) {
 		err = unix_mkname(sunaddr, alen, &hash);
@@ -1064,9 +1064,9 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	struct sock *other = NULL;
 	struct sk_buff *skb = NULL;
 	unsigned hash = 0;
-	int st = 0;
-	int err = 0;
-	long timeo = 0;
+	int st;
+	int err;
+	long timeo;
 
 	err = unix_mkname(sunaddr, addr_len, &hash);
 	if (err < 0)
@@ -1437,7 +1437,7 @@ static int unix_dgram_sendmsg(struct kiocb *kiocb, struct socket *sock,
 	struct sockaddr_un *sunaddr = msg->msg_name;
 	struct sock *other = NULL;
 	int namelen = 0; /* fake GCC */
-	int err = 0;
+	int err;
 	unsigned hash = 0;
 	struct sk_buff *skb;
 	long timeo = 0;
