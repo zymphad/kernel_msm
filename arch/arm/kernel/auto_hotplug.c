@@ -68,8 +68,8 @@
  * DISABLE is the load at which a CPU is disabled
  * These two are scaled based on num_online_cpus()
  */
-#define ENABLE_ALL_LOAD_THRESHOLD	(125 * CPUS_AVAILABLE)
-#define ENABLE_LOAD_THRESHOLD		225
+#define ENABLE_ALL_LOAD_THRESHOLD	(100 * CPUS_AVAILABLE)
+#define ENABLE_LOAD_THRESHOLD		300
 #define DISABLE_LOAD_THRESHOLD		60
 
 /* Control flags */
@@ -465,7 +465,7 @@ inline void hotplug_boostpulse(void)
 			cancel_delayed_work_sync(&hotplug_offline_work);
 			flags |= HOTPLUG_PAUSED;
 			schedule_work(&hotplug_online_single_work);
-			schedule_delayed_work(&hotplug_unpause_work, HZ * 2);
+			schedule_delayed_work(&hotplug_unpause_work, HZ);
 		} else {
 			pr_info("auto_hotplug: %s: %d CPUs online\n", __func__, num_online_cpus());
 			if (delayed_work_pending(&hotplug_offline_work)) {
