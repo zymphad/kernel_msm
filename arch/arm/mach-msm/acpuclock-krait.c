@@ -925,68 +925,63 @@ static void __init bus_init(const struct l2_level *l2_level)
 		dev_err(drv.dev, "initial bandwidth req failed (%d)\n", ret);
 }
 
-#ifdef CONFIG_CPU_FREQ_MSM
-static struct cpufreq_frequency_table freq_table[NR_CPUS][35];
-
 #ifdef CONFIG_MSM_CPU_VOLTAGE_CONTROL
-#define CPU_VDD_MAX		1450
-#define CPU_VDD_MIN		600
 
-static unsigned int cnt;
+#define MAX_VDD 1450
+#define MIN_VDD 600
 
-ssize_t show_UV_mV_table(struct cpufreq_policy *policy,
-					 char *buf)
+ssize_t acpuclk_get_vdd_levels_str(char *buf)
 {
+
 	int i, len = 0;
 
-	if (!buf)
-		return -EINVAL;
-
-	for (i = 0; drv.acpu_freq_tbl[i].speed.khz; i++) {
-		if (!drv.acpu_freq_tbl[i].use_for_scaling)
-			continue;
-
-		len += sprintf(buf + len, "%lumhz: %i mV\n",
-			drv.acpu_freq_tbl[i].speed.khz / 1000,
-				drv.acpu_freq_tbl[i].vdd_core / 1000);
+	if (buf) {
+		for (i = 0; drv.acpu_freq_tbl[i].speed.khz; i++) {
+            if (drv.acpu_freq_tbl[i].use_for_scaling) {
+                len += sprintf(buf + len, "%lumhz: %i mV\n",
+                           drv.acpu_freq_tbl[i].speed.khz/1000,
+                           drv.acpu_freq_tbl[i].vdd_core/1000 );
+            }
+		}
 	}
 	return len;
 }
 
-ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
-					 char *buf, size_t count)
+ssize_t acpuclk_set_vdd(char *buf)
 {
-	unsigned int val;
-	char size_cur[4];
-	int i, ret = 0;
+	unsigned int cur_volt;
+	char count[10];
+	int i;
+    int ret = 0;
 
-	if (cnt) {
-		cnt = 0;
+	if (!buf)
+		return -EINVAL;
+
+	for (i = 0; i < drv.acpu_freq_tbl[i].speed.khz; i++) {
+        if (drv.acpu_freq_tbl[i].use_for_scaling) {
+            ret = sscanf(buf, "%d", &cur_volt);
+
+            if (ret != 1)
                 return -EINVAL;
-	}
 
-	for (i = 0; i < ARRAY_SIZE(*freq_table); i++) {
-		if (!drv.acpu_freq_tbl[i].use_for_scaling)
-			continue;
+            if (cur_volt > MAX_VDD) {
+                cur_volt = MAX_VDD;
+            } else if (cur_volt < MIN_VDD) {
+                cur_volt = MIN_VDD;
+            }
 
-		ret = sscanf(buf, "%u", &val);
-		if (!ret)
-			return -EINVAL;
+            drv.acpu_freq_tbl[i].vdd_core = cur_volt*1000;
 
-		if (val > CPU_VDD_MAX)
-			val = CPU_VDD_MAX;
-		else if (val < CPU_VDD_MIN)
-			val = CPU_VDD_MIN;
-
-		drv.acpu_freq_tbl[i].vdd_core = val * 1000;
-
-		ret = sscanf(buf, "%s", size_cur);
-		buf += strlen(size_cur) + 1;
-		cnt = strlen(size_cur);
+            ret = sscanf(buf, "%s", count);
+            buf += (strlen(count)+1);
+        }
 	}
 	return ret;
 }
 #endif
+
+#ifdef CONFIG_CPU_FREQ_MSM
+static struct cpufreq_frequency_table freq_table[NR_CPUS][35];
 
 static void __init cpufreq_table_init(void)
 {
@@ -996,11 +991,11 @@ static void __init cpufreq_table_init(void)
 		int i, freq_cnt = 0;
 		/* Construct the freq_table tables from acpu_freq_tbl. */
 		for (i = 0; drv.acpu_freq_tbl[i].speed.khz != 0
-				&& freq_cnt < ARRAY_SIZE(*freq_table); i++) {
+             && freq_cnt < ARRAY_SIZE(*freq_table); i++) {
 			if (drv.acpu_freq_tbl[i].use_for_scaling) {
 				freq_table[cpu][freq_cnt].index = freq_cnt;
 				freq_table[cpu][freq_cnt].frequency
-					= drv.acpu_freq_tbl[i].speed.khz;
+                = drv.acpu_freq_tbl[i].speed.khz;
 				freq_cnt++;
 			}
 		}
@@ -1011,7 +1006,7 @@ static void __init cpufreq_table_init(void)
 		freq_table[cpu][freq_cnt].frequency = CPUFREQ_TABLE_END;
 
 		dev_info(drv.dev, "CPU%d: %d frequencies supported\n",
-			cpu, freq_cnt);
+                 cpu, freq_cnt);
 
 		/* Register table with CPUFreq. */
 		cpufreq_frequency_table_get_attr(freq_table[cpu], cpu);
@@ -1028,12 +1023,12 @@ static void __init dcvs_freq_init(void)
 	for (i = 0; drv.acpu_freq_tbl[i].speed.khz != 0; i++)
 		if (drv.acpu_freq_tbl[i].use_for_scaling)
 			msm_dcvs_register_cpu_freq(
-				drv.acpu_freq_tbl[i].speed.khz,
-				drv.acpu_freq_tbl[i].vdd_core / 1000);
+                                       drv.acpu_freq_tbl[i].speed.khz,
+                                       drv.acpu_freq_tbl[i].vdd_core / 1000);
 }
 
 static int __cpuinit acpuclk_cpu_callback(struct notifier_block *nfb,
-					    unsigned long action, void *hcpu)
+						unsigned long action, void *hcpu)
 {
 	static int prev_khz[NR_CPUS];
 	int rc, cpu = (int)hcpu;
