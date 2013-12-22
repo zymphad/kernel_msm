@@ -197,7 +197,7 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 	 * 3 = 128MHz
 	 * 2 = 200MHz
 	 * 1 = 320MHz
-	 * 0 = 400MHz
+	 * 0 = 487MHz
 	 *
 	 * Making the up_threshold value lower if the active level is 2 or 3 will
 	 * possibly improve smoothness while scrolling or open applications with
