@@ -168,7 +168,8 @@ static struct dbs_tuners {
 	.ui_sampling_rate = DEF_UI_DYNAMIC_SAMPLING_RATE,
 	.ui_timeout = DBS_UI_SAMPLING_TIMEOUT,
 	.enable_boost_cpu = 1,
-	.gboost = 1,
+	.gboost = 0,
+	.io_is_busy = 1,
 };
 
 bool is_elementalx_locked(void)
