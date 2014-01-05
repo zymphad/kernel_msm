@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/leds.h>
+#include <linux/workqueue.h>
 #include <linux/err.h>
 
 #include <linux/mfd/pm8xxx/core.h>
@@ -156,6 +157,7 @@ static const struct supported_leds led_map[] = {
  * struct pm8xxx_led_data - internal led data structure
  * @led_classdev - led class device
  * @id - led index
+ * @work - workqueue for led
  * @lock - to protect the transactions
  * @reg - cached value of led register
  * @pwm_dev - pointer to PWM device if LED is driven using PWM
@@ -169,6 +171,7 @@ struct pm8xxx_led_data {
 	u8			reg;
 	u8			wled_mod_ctrl_val;
 	struct device		*dev;
+	struct work_struct	work;
 	struct mutex		lock;
 	struct pwm_device	*pwm_dev;
 	int			pwm_channel;
@@ -420,11 +423,15 @@ static int pm8xxx_led_pwm_work(struct pm8xxx_led_data *led)
 		duty_us = (led->pwm_period_us * led->cdev.brightness) /
 								LED_FULL;
 		rc = pwm_config(led->pwm_dev, duty_us, led->pwm_period_us);
-		pwm_disable(led->pwm_dev);
-		led_rgb_write(led, SSBI_REG_ADDR_RGB_CNTL1,
-			led->cdev.brightness);
-		if (led->cdev.brightness)
+		if (led->cdev.brightness) {
+			led_rgb_write(led, SSBI_REG_ADDR_RGB_CNTL1,
+				led->cdev.brightness);
 			rc = pwm_enable(led->pwm_dev);
+		} else {
+			pwm_disable(led->pwm_dev);
+			led_rgb_write(led, SSBI_REG_ADDR_RGB_CNTL1,
+				led->cdev.brightness);
+		}
 	} else {
 		if (led->cdev.brightness)
 			led_rgb_write(led, SSBI_REG_ADDR_RGB_CNTL1,
@@ -477,7 +484,7 @@ static void __pm8xxx_led_work(struct pm8xxx_led_data *led,
 	mutex_unlock(&led->lock);
 }
 
-static void pm8xxx_update_led(struct pm8xxx_led_data *led)
+static void pm8xxx_led_work(struct work_struct *work)
 {
 	int rc;
 
@@ -486,9 +493,9 @@ static void pm8xxx_update_led(struct pm8xxx_led_data *led)
 	if (likely(keyled_debug_mask & DEBUG_LED_TRACE))
 		printk("[leds-pm8xxx] pm8xxx_led_work (id : %d )\n",led->id);
 	if (led->pwm_dev == NULL) {
-		__pm8xxx_update_led(led, led->cdev.brightness);
+		__pm8xxx_led_work(led, led->cdev.brightness);
 	} else {
-		rc = pm8xxx_led_update_pwm(led);
+		rc = pm8xxx_led_pwm_work(led);
 		if (rc)
 			pr_err("could not configure PWM mode for LED:%d\n",
 								led->id);
@@ -986,6 +993,7 @@ static int __devinit pm8xxx_led_probe(struct platform_device *pdev)
 			goto fail_id_check;
 
 		mutex_init(&led_dat->lock);
+		INIT_WORK(&led_dat->work, pm8xxx_led_work);
 
 		rc = led_classdev_register(&pdev->dev, &led_dat->cdev);
 		if (rc) {
@@ -1004,9 +1012,9 @@ static int __devinit pm8xxx_led_probe(struct platform_device *pdev)
 			if (led_dat->id == PM8XXX_ID_RGB_LED_RED ||
 				led_dat->id == PM8XXX_ID_RGB_LED_GREEN ||
 				led_dat->id == PM8XXX_ID_RGB_LED_BLUE)
-				__pm8xxx_update_led(led_dat, 0);
+				__pm8xxx_led_work(led_dat, 0);
 			else
-				__pm8xxx_update_led(led_dat,
+				__pm8xxx_led_work(led_dat,
 					led_dat->cdev.max_brightness);
 
 			if (led_dat->pwm_channel != -1) {
@@ -1026,10 +1034,6 @@ static int __devinit pm8xxx_led_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, led);
 	printk("[leds_pm8xxx] pm8xxx_led_probe end\n");
-
-	/* Config PWM */
-	if ((pdata) && (pdata->pwm_init))
-		pdata->pwm_init();
 
 	return 0;
 
@@ -1054,6 +1058,7 @@ static int __devexit pm8xxx_led_remove(struct platform_device *pdev)
 	struct pm8xxx_led_data *led = platform_get_drvdata(pdev);
 
 	for (i = 0; i < pdata->num_leds; i++) {
+		cancel_work_sync(&led[i].work);
 		mutex_destroy(&led[i].lock);
 		led_classdev_unregister(&led[i].cdev);
 		if (led[i].pwm_dev != NULL)
