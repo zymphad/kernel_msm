@@ -79,36 +79,20 @@ struct lge_touch_attribute {
 	ssize_t (*store)(struct lge_touch_data *ts, const char *buf, size_t count);
 };
 
-struct touch_control_attribute {
-	struct attribute attr;
-	ssize_t (*show)(struct lge_touch_data *ts, char *buf);
-	ssize_t (*store)(struct lge_touch_data *ts,
-				const char *buf, size_t count);
-};
-
-static int is_pressure;
-static int is_width_major;
-static int is_width_minor;
-
-#define LGE_TOUCH_ATTR(_name, _mode, _show, _store)               \
-	struct lge_touch_attribute lge_touch_attr_##_name =       \
-	__ATTR(_name, _mode, _show, _store)
-
-#define TOUCH_CONTROL_ATTR(_name, _mode, _show, _store)               \
-	struct touch_control_attribute touch_control_attr_##_name =       \
-	__ATTR(_name, _mode, _show, _store)
+#define LGE_TOUCH_ATTR(_name, _mode, _show, _store)	\
+struct lge_touch_attribute lge_touch_attr_##_name = __ATTR(_name, _mode, _show, _store)
 
 /* Debug mask value
  * usage: echo [debug_mask] > /sys/module/lge_touch_core/parameters/debug_mask
  */
-u32 touch_debug_mask = 0;
+u32 touch_debug_mask = DEBUG_BASE_INFO;
 module_param_named(debug_mask, touch_debug_mask, int, S_IRUGO|S_IWUSR|S_IWGRP);
 
 #ifdef LGE_TOUCH_TIME_DEBUG
 /* Debug mask value
  * usage: echo [debug_mask] > /sys/module/lge_touch_core/parameters/time_debug_mask
  */
-u32 touch_time_debug_mask = 0;
+u32 touch_time_debug_mask = DEBUG_TIME_PROFILE_NONE;
 module_param_named(time_debug_mask, touch_time_debug_mask, int, S_IRUGO|S_IWUSR|S_IWGRP);
 
 #ifdef CUST_G_TOUCH
@@ -2498,34 +2482,25 @@ static ssize_t show_platform_data(struct lge_touch_data *ts, char *buf)
 	ret += sprintf(buf+ret, "\tlcd_x                 = %d\n", pdata->caps->lcd_x);
 	ret += sprintf(buf+ret, "\tlcd_y                 = %d\n", pdata->caps->lcd_y);
 	ret += sprintf(buf+ret, "role:\n");
-	ret += sprintf(buf+ret, "\toperation_mode        = %d\n",
-			pdata->role->operation_mode);
-	ret += sprintf(buf+ret, "\tkey_type              = %d\n",
-			pdata->role->key_type);
-	ret += sprintf(buf+ret, "\treport_mode           = %d\n",
-			pdata->role->report_mode);
-	ret += sprintf(buf+ret, "\tdelta_pos_threshold   = %d\n",
-			pdata->role->delta_pos_threshold);
-	ret += sprintf(buf+ret, "\torientation           = %d\n",
-			pdata->role->orientation);
-	ret += sprintf(buf+ret, "\treport_period         = %d\n",
-			pdata->role->report_period);
-	ret += sprintf(buf+ret, "\tbooting_delay         = %d\n",
-			pdata->role->booting_delay);
-	ret += sprintf(buf+ret, "\treset_delay           = %d\n",
-			pdata->role->reset_delay);
-	ret += sprintf(buf+ret, "\tsuspend_pwr           = %d\n",
-			pdata->role->suspend_pwr);
-	ret += sprintf(buf+ret, "\tresume_pwr            = %d\n",
-			pdata->role->resume_pwr);
-	ret += sprintf(buf+ret, "\tirqflags              = 0x%lx\n",
-			pdata->role->irqflags);
-	ret += sprintf(buf+ret, "\tshow_touches          = %d\n",
-			pdata->role->show_touches);
-	ret += sprintf(buf+ret, "\tpointer_location      = %d\n",
-			pdata->role->pointer_location);
-	ret += sprintf(buf+ret, "\taccuracy_filter_enable = %d\n",
-			pdata->role->accuracy_filter_enable);
+	ret += sprintf(buf+ret, "\toperation_mode        = %d\n", pdata->role->operation_mode);
+	ret += sprintf(buf+ret, "\tkey_type              = %d\n", pdata->role->key_type);
+	ret += sprintf(buf+ret, "\treport_mode           = %d\n", pdata->role->report_mode);
+	ret += sprintf(buf+ret, "\tdelta_pos_threshold   = %d\n", pdata->role->delta_pos_threshold);
+	ret += sprintf(buf+ret, "\torientation           = %d\n", pdata->role->orientation);
+	ret += sprintf(buf+ret, "\treport_period         = %d\n", pdata->role->report_period);
+	ret += sprintf(buf+ret, "\tbooting_delay         = %d\n", pdata->role->booting_delay);
+	ret += sprintf(buf+ret, "\treset_delay           = %d\n", pdata->role->reset_delay);
+	ret += sprintf(buf+ret, "\tsuspend_pwr           = %d\n", pdata->role->suspend_pwr);
+	ret += sprintf(buf+ret, "\tresume_pwr            = %d\n", pdata->role->resume_pwr);
+	ret += sprintf(buf+ret, "\tirqflags              = 0x%lx\n", pdata->role->irqflags);
+#ifdef CUST_G_TOUCH
+	ret += sprintf(buf+ret, "\tshow_touches          = %d\n", pdata->role->show_touches);
+	ret += sprintf(buf+ret, "\tpointer_location      = %d\n", pdata->role->pointer_location);
+	ret += sprintf(buf+ret, "\tta debouncing         = %d\n", pdata->role->ta_debouncing_count);
+	ret += sprintf(buf+ret, "\tta debouncing finger num  = %d\n", pdata->role->ta_debouncing_finger_num);
+	ret += sprintf(buf+ret, "\tghost_detection_enable= %d\n", pdata->role->ghost_detection_enable);
+	ret += sprintf(buf+ret, "\tpen_enable			 = %d\n", pdata->role->pen_enable);
+#endif
 	ret += sprintf(buf+ret, "pwr:\n");
 	ret += sprintf(buf+ret, "\tuse_regulator         = %d\n", pdata->pwr->use_regulator);
 	ret += sprintf(buf+ret, "\tvdd                   = %s\n", pdata->pwr->vdd);
@@ -3122,120 +3097,105 @@ static ssize_t show_pen_enable(struct lge_touch_data *ts, char *buf)
 	return ret;
 }
 
-/*
- * Lets tweak the accuracy filter:
- *
- *  @ignore_pressure_gap;
- *  @touch_max_count;
- *  @delta_max;
- *  @max_pressure;
- *  @direction_count;
- *  @time_to_max_pressure;
- *
- */
-
-//ignore_pressure_gap
-static ssize_t store_ignore_pressure_gap(struct lge_touch_data *ts, const char *buf, size_t count)
+static ssize_t show_ts_noise(struct lge_touch_data *ts, char *buf)
 {
-	unsigned int val;
+	int ret = 0;
 
-	sscanf(buf, "%d", &val);
+	struct timeval t_start, t_cur;
 
-	ts->accuracy_filter.ignore_pressure_gap = val;
+	u8 buf1=0, buf2=0, cns=0;
+	u16 alpha=0, im=0, vm=0, aim=0;
+	unsigned long alpha_sum=0, cns_sum=0, im_sum=0, vm_sum=0, aim_sum=0;
+	unsigned int cnt = 0;
 
-	return count;
+	if (ts->curr_pwr_state == POWER_ON || ts->curr_pwr_state == POWER_WAKE) {
+
+		if (ts->pdata->role->operation_mode)
+			disable_irq(ts->client->irq);
+		else
+			hrtimer_cancel(&ts->timer);
+
+		if (unlikely(touch_i2c_write_byte(ts->client, 0xFF, 0x01) < 0)) {
+			ret = sprintf(buf+ret, "PAGE_SELECT_REG write fail\n");
+			return ret;
+		}
+
+		do_gettimeofday(&t_start);
+
+		while(1) {
+
+			if (unlikely(touch_i2c_read(ts->client, 0x0e, 1, &buf1) < 0)) {
+				ret += sprintf(buf+ret, "Alpha REG read fail\n");
+			}
+
+			if (unlikely(touch_i2c_read(ts->client, 0x0f, 1, &buf2) < 0)) {
+				ret += sprintf(buf+ret, "Alpha REG read fail\n");
+			}
+			alpha = (buf2<<8)|buf1;
+			alpha_sum += alpha;
+
+			if (unlikely(touch_i2c_read(ts->client, 0x0D, 1, &cns) < 0)) {
+				ret += sprintf(buf+ret, "Current Noise State REG read fail\n");
+			}
+			cns_sum += cns;
+
+			if (unlikely(touch_i2c_read(ts->client, 0x05, 1, &buf1) < 0)) {
+				ret += sprintf(buf+ret, "Interference Metric REG read fail\n");
+			}
+			if (unlikely(touch_i2c_read(ts->client, 0x06, 1, &buf2) < 0)) {
+				ret += sprintf(buf+ret, "Interference Metric REG read fail\n");
+			}
+			im = (buf2<<8)|buf1;
+			im_sum += im;
+
+			if (unlikely(touch_i2c_read(ts->client, 0x09, 1, &buf1) < 0)) {
+				ret += sprintf(buf+ret, "Variance Metric REG read fail\n");
+			}
+			if (unlikely(touch_i2c_read(ts->client, 0x0a, 1, &buf2) < 0)) {
+				ret += sprintf(buf+ret, "Variance Metric REG read fail\n");
+			}
+			vm = (buf2<<8)|buf1;
+			vm_sum += vm;
+
+			if (unlikely(touch_i2c_read(ts->client, 0x0b, 1, &buf1) < 0)) {
+				ret += sprintf(buf+ret, "Averaged IM REG read fail\n");
+			}
+			if (unlikely(touch_i2c_read(ts->client, 0x0c, 1, &buf2) < 0)) {
+				ret += sprintf(buf+ret, "Averaged IM REG read fail\n");
+			}
+			aim = (buf2<<8)|buf1;
+			aim_sum += aim;
+
+			do_gettimeofday(&t_cur);
+
+			cnt++;
+
+			if(t_cur.tv_sec - t_start.tv_sec > 3) break;
+		}
+
+		ret += sprintf(buf+ret, "Test Count : %u\n", cnt);
+		ret += sprintf(buf+ret, "Alpha : %lu\n", alpha_sum/cnt);
+		ret += sprintf(buf+ret, "Current Noise State : %lu\n", cns_sum/cnt);
+		ret += sprintf(buf+ret, "Interference Metric : %lu\n", im_sum/cnt);
+		ret += sprintf(buf+ret, "Variance Metric : %lu\n", vm_sum/cnt);
+		ret += sprintf(buf+ret, "Averaged IM : %lu\n", aim_sum/cnt);
+
+		if (unlikely(touch_i2c_write_byte(ts->client, 0xFF, 0x00) < 0)) {
+			ret += sprintf(buf+ret, "PAGE_SELECT_REG write fail\n");
+			return ret;
+		}
+
+		if (ts->pdata->role->operation_mode)
+			enable_irq(ts->client->irq);
+		else
+			hrtimer_start(&ts->timer, ktime_set(0, ts->pdata->role->report_period), HRTIMER_MODE_REL);
+	}else {
+		ret = sprintf(buf+ret, "state=[suspend]. we cannot use I2C, now. Test Result: Fail\n");
+	}
+
+	return ret;
 }
-
-static ssize_t show_ignore_pressure_gap(struct lge_touch_data *ts, char *buf)
-{
-	return sprintf(buf, "%d\n", ts->accuracy_filter.ignore_pressure_gap);
-}
-
-//touch_max_count
-static ssize_t store_touch_max_count(struct lge_touch_data *ts, const char *buf, size_t count)
-{
-	unsigned int val;
-
-	sscanf(buf, "%d", &val);
-
-	ts->accuracy_filter.touch_max_count = val;
-
-	return count;
-}
-
-static ssize_t show_touch_max_count(struct lge_touch_data *ts, char *buf)
-{
-	return sprintf(buf, "%d\n", ts->accuracy_filter.touch_max_count);
-}
-
-//delta_max
-static ssize_t store_delta_max(struct lge_touch_data *ts, const char *buf, size_t count)
-{
-	unsigned int val;
-
-	sscanf(buf, "%d", &val);
-
-	ts->accuracy_filter.delta_max = val;
-
-	return count;
-}
-
-static ssize_t show_delta_max(struct lge_touch_data *ts, char *buf)
-{
-	return sprintf(buf, "%d\n", ts->accuracy_filter.delta_max);
-}
-
-//max_pressure
-static ssize_t store_max_pressure(struct lge_touch_data *ts, const char *buf, size_t count)
-{
-	unsigned int val;
-
-	sscanf(buf, "%d", &val);
-
-	ts->accuracy_filter.max_pressure = val;
-
-	return count;
-}
-
-static ssize_t show_max_pressure(struct lge_touch_data *ts, char *buf)
-{
-	return sprintf(buf, "%d\n", ts->accuracy_filter.max_pressure);
-}
-
-//direction_count
-static ssize_t store_direction_count(struct lge_touch_data *ts, const char *buf, size_t count)
-{
-	unsigned int val;
-
-	sscanf(buf, "%d", &val);
-
-	ts->accuracy_filter.direction_count = val;
-
-	return count;
-}
-
-static ssize_t show_direction_count(struct lge_touch_data *ts, char *buf)
-{
-	return sprintf(buf, "%d\n", ts->accuracy_filter.direction_count);
-}
-
-//time_to_max_pressure
-static ssize_t store_time_to_max_pressure(struct lge_touch_data *ts, const char *buf, size_t count)
-{
-	unsigned int val;
-
-	sscanf(buf, "%d", &val);
-
-	ts->accuracy_filter.time_to_max_pressure = val;
-
-	return count;
-}
-
-static ssize_t show_time_to_max_pressure(struct lge_touch_data *ts, char *buf)
-{
-	return sprintf(buf, "%d\n", ts->accuracy_filter.time_to_max_pressure);
-}
-
+#endif
 static LGE_TOUCH_ATTR(platform_data, S_IRUGO | S_IWUSR, show_platform_data, NULL);
 static LGE_TOUCH_ATTR(firmware, S_IRUGO | S_IWUSR, show_fw_info, store_fw_upgrade);
 static LGE_TOUCH_ATTR(fw_ver, S_IRUGO | S_IWUSR, show_fw_ver, NULL);
@@ -3259,13 +3219,6 @@ static LGE_TOUCH_ATTR(pen_enable, S_IRUGO | S_IWUSR, show_pen_enable, NULL);
 static LGE_TOUCH_ATTR(ts_noise, S_IRUGO | S_IWUSR, show_ts_noise, NULL);
 #endif
 
-static LGE_TOUCH_ATTR(ignore_pressure_gap, S_IRUGO | S_IWUSR, show_ignore_pressure_gap, store_ignore_pressure_gap);
-static LGE_TOUCH_ATTR(touch_max_count, S_IRUGO | S_IWUSR, show_touch_max_count, store_touch_max_count);
-static LGE_TOUCH_ATTR(delta_max, S_IRUGO | S_IWUSR, show_delta_max, store_delta_max);
-static LGE_TOUCH_ATTR(max_pressure, S_IRUGO | S_IWUSR, show_max_pressure, store_max_pressure);
-static LGE_TOUCH_ATTR(direction_count, S_IRUGO | S_IWUSR, show_direction_count, store_direction_count);
-static LGE_TOUCH_ATTR(time_to_max_pressure, S_IRUGO | S_IWUSR, show_time_to_max_pressure, store_time_to_max_pressure);
-
 static struct attribute *lge_touch_attribute_list[] = {
 	&lge_touch_attr_platform_data.attr,
 	&lge_touch_attr_firmware.attr,
@@ -3280,13 +3233,15 @@ static struct attribute *lge_touch_attribute_list[] = {
 #ifdef CUST_G_TOUCH
 	&lge_touch_attr_show_touches.attr,
 	&lge_touch_attr_pointer_location.attr,
-	&lge_touch_attr_charger.attr,
-	&lge_touch_attr_ignore_pressure_gap.attr,
-	&lge_touch_attr_touch_max_count.attr,
-	&lge_touch_attr_delta_max.attr,
-	&lge_touch_attr_max_pressure.attr,
-	&lge_touch_attr_direction_count.attr,
-	&lge_touch_attr_time_to_max_pressure.attr,
+	&lge_touch_attr_incoming_call.attr,
+	&lge_touch_attr_f54.attr,
+	&lge_touch_attr_report_mode.attr,
+	&lge_touch_attr_ta_debouncing_count.attr,
+	&lge_touch_attr_ta_debouncing_finger_num.attr,
+	&lge_touch_attr_ghost_detection_enable.attr,
+	&lge_touch_attr_pen_enable.attr,
+	&lge_touch_attr_ts_noise.attr,
+#endif
 	NULL,
 };
 
@@ -3793,7 +3748,7 @@ int touch_driver_register(struct touch_device_driver* driver)
 
 	touch_device_func = driver;
 
-	touch_wq = create_workqueue("touch_wq");
+	touch_wq = create_singlethread_workqueue("touch_wq");
 	if (!touch_wq) {
 		TOUCH_ERR_MSG("CANNOT create new workqueue\n");
 		ret = -ENOMEM;
