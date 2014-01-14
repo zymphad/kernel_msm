@@ -252,7 +252,7 @@ ENTRY(v4wb_dma_unmap_area)
 ENDPROC(v4wb_dma_unmap_area)
 
 	.globl  v4_flush_kern_cache_louis
-	.equ  v4_flush_kern_cache_louis, v4_flush_kern_cache_all
+	.equ  v4_flush_kern_cache_louis, v4wb_flush_kern_cache_all
 
 	__INITDATA
 
