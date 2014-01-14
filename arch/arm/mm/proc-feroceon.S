@@ -414,6 +414,9 @@ ENTRY(feroceon_dma_unmap_area)
 	mov	pc, lr
 ENDPROC(feroceon_dma_unmap_area)
 
+	.globl  ferocean_flush_kern_cache_louis
+	.equ  ferocean_flush_kern_cache_louis, ferocean_flush_kern_cache_all
+
 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
 	define_cache_functions feroceon
 
